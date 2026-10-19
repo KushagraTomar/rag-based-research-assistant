@@ -11,10 +11,13 @@ from pinecone import Pinecone, ServerlessSpec
 
 from app.retrieval.utils import convert_section_headers
 
-EMBEDDING_MODEL = "mistral-embed"
-PINECONE_INDEX_NAME = "pdf-structured-rag-mistral"
-PINECONE_INDEX_DIMENSION = 1024
-PINECONE_NAMESPACE = "default"
+from app.utils import (
+    EMBEDDING_MODEL,
+    PINECONE_INDEX_NAME,
+    PINECONE_NAMESPACE,
+    PINECONE_INDEX_DIMENSION,
+    get_embeddings,
+)
 
 headers_to_split_on = [
     ("#", "Header_1"), ("##", "Header_2"), ("###", "Header_3"),

@@ -3,18 +3,18 @@ from typing import Any, List, TypedDict
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
+from langchain_mistralai import ChatMistralAI
 from langchain_pinecone import PineconeVectorStore
 from langgraph.graph import END, START, StateGraph
 
-LLM_TEMPERATURE = 0.1
-EMBEDDING_MODEL = "mistral-embed"
-PINECONE_INDEX_NAME = "pdf-structured-rag-mistral"
-PINECONE_INDEX_DIMENSION = 1024
-PINECONE_NAMESPACE = "default"
-
-def get_embeddings() -> MistralAIEmbeddings:
-    return MistralAIEmbeddings(model=EMBEDDING_MODEL)
+from app.utils import (
+    LLM_TEMPERATURE,
+    MISTRAL_API_KEY,
+    MISTRAL_MODEL,
+    PINECONE_INDEX_NAME,
+    PINECONE_NAMESPACE,
+    get_embeddings,
+)
 
 class RAGState(TypedDict, total=False):
     question: str              # User's question
@@ -95,27 +95,3 @@ class RAGPipeline:
 
 # Initialize singleton pipeline instance
 rag_pipeline = RAGPipeline()
-
-# def answer_question_with_cache(question: str) -> Tuple[str, bool]:
-#     """Answer a question with caching. Returns (answer, was_cached)"""
-#     cache = get_cache()
-#     matcher = get_similarity_matcher()
-    
-#     # Generate cache key
-#     cache_key = matcher.get_cache_key(question)
-    
-#     # Check cache first
-#     cached_result = cache.get(cache_key)
-#     if cached_result:
-#         logger.info(f"Cache hit for question: {question}")
-#         return cached_result.get("answer", ""), True
-    
-#     # Cache miss - generate answer
-#     logger.info(f"Cache miss for question: {question}")
-#     answer = rag_pipeline.answer(question)
-    
-#     # Store in cache
-#     cache_data = {"answer": answer}
-#     cache.set(cache_key, cache_data)
-    
-#     return answer, False
