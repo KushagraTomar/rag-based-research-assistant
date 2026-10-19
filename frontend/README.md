@@ -1,6 +1,6 @@
-# Adaptive RAG Frontend (React + Vite)
+# RAG Frontend (React + Vite)
 
-A modern React frontend for the Adaptive RAG (Retrieval-Augmented Generation) system built with Vite.
+A modern React frontend for the RAG (Retrieval-Augmented Generation) system built with Vite.
 
 ## Project Structure
 

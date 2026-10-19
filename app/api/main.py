@@ -4,8 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 
 app = FastAPI(
-    title="Adaptive RAG API",
-    description="An API for Adaptive Retrieval-Augmented Generation",
+    title="RAG based Research Assistant API",
     version="1.0.0"
 )
 

@@ -1,15 +1,7 @@
 # RAG Based Research Assistant using LangChain
 
 
-This project implements an Adaptive Retrieval-Augmented Generation (RAG) system using LangChain and exposes it through a FastAPI backend.
-
-## Features
-
-- Adaptive question routing between vectorstore and web search
-- Document relevance grading
-- Hallucination detection
-- Answer quality assessment
-- Question rewriting for better retrieval
+This project implements an Retrieval-Augmented Generation (RAG) system using LangChain and exposes it through a FastAPI backend.
 
 ## Run
 ```bash

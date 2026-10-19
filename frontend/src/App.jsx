@@ -56,7 +56,7 @@ function App() {
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>🤖 Adaptive RAG Question Answering</h1>
+      <h1 className={styles.title}>RAG - Question Answering</h1>
 
       <PDFUploader
         onSuccess={handleUploadSuccess}
