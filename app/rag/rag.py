@@ -7,13 +7,7 @@ from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langgraph.graph import END, START, StateGraph
 
-# from app.cache.redis_cache import get_cache
-from config.settings import (
-    LLM_TEMPERATURE, 
-    MISTRAL_API_KEY, 
-    MISTRAL_MODEL
-)
-
+LLM_TEMPERATURE = 0.1
 EMBEDDING_MODEL = "mistral-embed"
 PINECONE_INDEX_NAME = "pdf-structured-rag-mistral"
 PINECONE_INDEX_DIMENSION = 1024
