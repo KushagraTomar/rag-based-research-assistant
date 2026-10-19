@@ -19,103 +19,67 @@ PINECONE_INDEX_NAME = "pdf-structured-rag-mistral"
 PINECONE_INDEX_DIMENSION = 1024
 PINECONE_NAMESPACE = "default"
 
+headers_to_split_on = [
+    ("#", "Header_1"), ("##", "Header_2"), ("###", "Header_3"),
+], 
+
 def get_embeddings() -> MistralAIEmbeddings:
     return MistralAIEmbeddings(model=EMBEDDING_MODEL)
 
-# 1. Load the PDF natively as structured Markdown
-# Resolve the repo root relative to this file so it works regardless of where the script is launched from.
-repo_root = Path(__file__).resolve().parents[2]
-pdf_files = sorted((repo_root / "data").glob("*.pdf"))
 
-if not pdf_files:
-    raise FileNotFoundError("No PDF files found in the directory.")
-
-# 2. Load each PDF as structured Markdown
-documents = []
-
-for pdf_path in pdf_files:
-    loader = PyMuPDF4LLMLoader(
-        file_path=str(pdf_path),
-        mode="single"
+def chunk_documents(documents: List[Document]) -> List[Document]:
+    markdown_splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=headers_to_split_on,
+        strip_headers=False
     )
-    loaded_docs = loader.load()
-    documents.extend(loaded_docs)
-
-print(f"Total loaded documents: {len(documents)}")
-
-# 4. Define the Markdown Header Splitter rules
-# This extracts headers into structural metadata instead of breaking them mid-sentence
-headers_to_split_on = [
-    ("#", "Header_1"),
-    ("##", "Header_2"),
-    ("###", "Header_3"),
-]
-
-markdown_splitter = MarkdownHeaderTextSplitter(
-    headers_to_split_on=headers_to_split_on, 
-    strip_headers=False  # Keeps the markdown tags (#) inside the chunk text for LLM context
-)
-
-final_chunks = []
-
-# 3. Process each PDF's Markdown content
-for doc in documents:
-    markdown_text = doc.page_content
-    markdown_text = convert_section_headers(markdown_text)
-
-    # 3. Perform structure-aware splitting
-    header_chunks = markdown_splitter.split_text(markdown_text)
-
-    # 4. Sub-chunk massive sections (Sub-splitting)
-    # If a single section is huge, recursively break it down safely by characters
-
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
+    chunks = []
+    for doc in documents:
+        # Convert section headers to markdown format
+        markdown_text = convert_section_headers(doc.page_content)
+        # Split the document into chunks based on markdown headers
+        for chunk in markdown_splitter.split_text(markdown_text):
+            chunk.metadata.update(doc.metadata)  # keep source file info
+            if len(chunk.page_content) <= 1000:
+                chunks.append(chunk)
+            else:
+                # Further split large chunks into smaller ones
+                chunks.extend(text_splitter.split_documents([chunk]))
+    return chunks
 
-    for chunk in header_chunks:
-        # If the structural chunk fits our size limits, keep it whole
-        if len(chunk.page_content) <= 1000:
-            final_chunks.append(chunk)
-        else:
-            # Otherwise, split it further but pass down the header metadata inherited above
-            sub_splits = text_splitter.split_documents([chunk])
-            final_chunks.extend(sub_splits)
 
-# 1. Initialize the Embedding Model
-embeddings = get_embeddings()
+def ensure_index() -> None:
+    pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
+    if not pc.has_index(PINECONE_INDEX_NAME):
+        pc.create_index(
+            name=PINECONE_INDEX_NAME,
+            vector_type="dense",
+            dimension=PINECONE_INDEX_DIMENSION,
+            metric="cosine",
+            spec=ServerlessSpec(cloud="aws", region="us-east-1"),
+        )
 
-# 2. Setup Pinecone Client
-pinecone_api_key = os.getenv("PINECONE_API_KEY")
-if not pinecone_api_key:
-    raise ValueError(
-        "Set the PINECONE_API_KEY environment variable before running this script."
+
+def ingest_pdf(pdf_path: str) -> int:
+    """Load, chunk and upload a single PDF. Returns number of chunks indexed."""
+    ensure_index()
+    # Load pdfs
+    documents = PyMuPDF4LLMLoader(
+        file_path=str(pdf_path), 
+        mode="single").load()
+    # Chunk documents
+    chunks = chunk_documents(documents)
+    # Embed and upload to Pinecone
+    PineconeVectorStore.from_documents(
+        documents=chunks,
+        embedding=get_embeddings(),
+        index_name=PINECONE_INDEX_NAME,
+        namespace=PINECONE_NAMESPACE,
     )
+    return len(chunks)
 
-pc = Pinecone(api_key=pinecone_api_key)
-index_name = PINECONE_INDEX_NAME
 
-# Create the index if it doesn't exist yet
-if not pc.has_index(index_name):
-    pc.create_index(
-        name=index_name,
-        vector_type="dense",
-        dimension=PINECONE_INDEX_DIMENSION,
-        metric="cosine",
-        spec=ServerlessSpec(
-            cloud='aws',
-            region='us-east-1',
-        ),
-    )
-    print(f"Created Pinecone index '{index_name}'.")
-else:
-    print(f"Pinecone index '{index_name}' already exists.")
-
-# 3. Batch Upload Chunks to Pinecone
-# This automatically converts documents, extracts text, builds vectors, and copies metadata
-print("Embedding chunks and uploading to Pinecone...")
-vector_store = PineconeVectorStore.from_documents(
-    documents=final_chunks, # The chunks list from your PyMuPDF4LLM step
-    embedding=embeddings,
-    index_name=index_name,
-    namespace=PINECONE_NAMESPACE,
-)
-print("Ingestion complete!")
+if __name__ == "__main__":
+    data_dir = Path(__file__).resolve().parents[2] / "data"
+    for pdf in sorted(data_dir.glob("*.pdf")):
+        print(f"{pdf.name}: {ingest_pdf(str(pdf))} chunks")
