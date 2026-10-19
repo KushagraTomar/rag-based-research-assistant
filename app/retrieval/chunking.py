@@ -1,17 +1,14 @@
 import os
 from pathlib import Path
+from typing import List
+
+from langchain_core.documents import Document
 from langchain_mistralai import MistralAIEmbeddings
 from langchain_pymupdf4llm import PyMuPDF4LLMLoader
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone, ServerlessSpec
 
-from app.retrieval.embeddings import (
-    PINECONE_INDEX_DIMENSION,
-    PINECONE_INDEX_NAME,
-    PINECONE_NAMESPACE,
-    get_embeddings,
-)
 from app.retrieval.utils import convert_section_headers
 
 EMBEDDING_MODEL = "mistral-embed"
@@ -21,7 +18,7 @@ PINECONE_NAMESPACE = "default"
 
 headers_to_split_on = [
     ("#", "Header_1"), ("##", "Header_2"), ("###", "Header_3"),
-], 
+]
 
 def get_embeddings() -> MistralAIEmbeddings:
     return MistralAIEmbeddings(model=EMBEDDING_MODEL)

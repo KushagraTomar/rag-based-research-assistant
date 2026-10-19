@@ -3,7 +3,7 @@ from typing import Any, List, TypedDict
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_mistralai import ChatMistralAI
+from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langgraph.graph import END, START, StateGraph
 
@@ -13,11 +13,14 @@ from config.settings import (
     MISTRAL_API_KEY, 
     MISTRAL_MODEL
 )
-from app.retrieval.embeddings import (
-    PINECONE_INDEX_NAME,
-    PINECONE_NAMESPACE,
-    get_embeddings,
-)
+
+EMBEDDING_MODEL = "mistral-embed"
+PINECONE_INDEX_NAME = "pdf-structured-rag-mistral"
+PINECONE_INDEX_DIMENSION = 1024
+PINECONE_NAMESPACE = "default"
+
+def get_embeddings() -> MistralAIEmbeddings:
+    return MistralAIEmbeddings(model=EMBEDDING_MODEL)
 
 class RAGState(TypedDict, total=False):
     question: str              # User's question
