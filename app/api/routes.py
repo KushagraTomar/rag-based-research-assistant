@@ -3,7 +3,7 @@ import os
 import shutil
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from app.models.schemas import RAGRequest, RAGResponse
-from app.rag.rag import answer_question, answer_question_with_cache
+from app.rag.rag import rag_pipeline, answer_question_with_cache
 from app.utils.logging import setup_logging
 from app.retrieval.ingestion import ingest_pdf
 from app.cache.redis_cache import get_cache
@@ -19,7 +19,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.get("/")
 async def root():
     """Root endpoint"""
-    return {"message": "Welcome to the Adaptive RAG API", "version": "1.0.0"}
+    return {"message": "Welcome to the RAG API", "version": "1.0.0"}
 
 
 @router.post("/ask", response_model=RAGResponse)

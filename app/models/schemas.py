@@ -1,14 +1,6 @@
 """Pydantic models for request/response validation"""
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from langchain_core.documents import Document
-
-
-class GradeDocuments(BaseModel):
-    """LLM output for grading document relevance"""
-    binary_score: str = Field(
-        description="Documents are relevant to the question, 'yes' or 'no'"
-    )
 
 
 class RAGRequest(BaseModel):

@@ -24,8 +24,6 @@ class RAGState(TypedDict, total=False):
     documents: List[Document]  # Retrieved documents
     context: str               # Formatted context from retrieved documents
     answer: str                # Generated answer to the question
-    is_relevant: bool          # Whether documents are relevant to question
-    transformed_query: str     # Query after transformation
 
 def format_docs(docs: List[Any]) -> str:
     return "\n\n".join(doc.page_content for doc in docs)
@@ -100,14 +98,6 @@ class RAGPipeline:
 
 # Initialize singleton pipeline instance
 rag_pipeline = RAGPipeline()
-
-def answer_question(question: str) -> str:
-    """Answer a question using the RAG system"""
-    return rag_pipeline.answer(question)
-
-if __name__ == "__main__":
-    question = input("Question: ")
-    print(answer_question(question))
 
 # def answer_question_with_cache(question: str) -> Tuple[str, bool]:
 #     """Answer a question with caching. Returns (answer, was_cached)"""
