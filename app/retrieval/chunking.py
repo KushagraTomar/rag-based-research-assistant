@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import List
 
 from langchain_core.documents import Document
-from langchain_mistralai import MistralAIEmbeddings
 from langchain_pymupdf4llm import PyMuPDF4LLMLoader
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_pinecone import PineconeVectorStore
@@ -11,20 +10,20 @@ from pinecone import Pinecone, ServerlessSpec
 
 from app.retrieval.utils import convert_section_headers
 
-from app.utils import (
-    EMBEDDING_MODEL,
+from app.config import (
+    PINECONE_API_KEY,
     PINECONE_INDEX_NAME,
-    PINECONE_NAMESPACE,
     PINECONE_INDEX_DIMENSION,
-    get_embeddings,
+    PINECONE_NAMESPACE,
+    CHUNK_SIZE,
+    CHUNK_OVERLAP
 )
+
+from app.retrieval.embedding import get_embeddings
 
 headers_to_split_on = [
     ("#", "Header_1"), ("##", "Header_2"), ("###", "Header_3"),
 ]
-
-def get_embeddings() -> MistralAIEmbeddings:
-    return MistralAIEmbeddings(model=EMBEDDING_MODEL)
 
 
 def chunk_documents(documents: List[Document]) -> List[Document]:
@@ -32,7 +31,7 @@ def chunk_documents(documents: List[Document]) -> List[Document]:
         headers_to_split_on=headers_to_split_on,
         strip_headers=False
     )
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
     chunks = []
     for doc in documents:
         # Convert section headers to markdown format
@@ -40,7 +39,7 @@ def chunk_documents(documents: List[Document]) -> List[Document]:
         # Split the document into chunks based on markdown headers
         for chunk in markdown_splitter.split_text(markdown_text):
             chunk.metadata.update(doc.metadata)  # keep source file info
-            if len(chunk.page_content) <= 1000:
+            if len(chunk.page_content) <= CHUNK_SIZE:
                 chunks.append(chunk)
             else:
                 # Further split large chunks into smaller ones
@@ -49,7 +48,7 @@ def chunk_documents(documents: List[Document]) -> List[Document]:
 
 
 def ensure_index() -> None:
-    pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
+    pc = Pinecone(api_key=PINECONE_API_KEY)
     if not pc.has_index(PINECONE_INDEX_NAME):
         pc.create_index(
             name=PINECONE_INDEX_NAME,

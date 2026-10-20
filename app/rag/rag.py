@@ -7,14 +7,16 @@ from langchain_mistralai import ChatMistralAI
 from langchain_pinecone import PineconeVectorStore
 from langgraph.graph import END, START, StateGraph
 
-from app.utils import (
+from app.retrieval.embedding import get_embeddings
+
+from app.config import (
     LLM_TEMPERATURE,
     MISTRAL_API_KEY,
     MISTRAL_MODEL,
     PINECONE_INDEX_NAME,
     PINECONE_NAMESPACE,
-    get_embeddings,
 )
+
 
 class RAGState(TypedDict, total=False):
     question: str              # User's question
