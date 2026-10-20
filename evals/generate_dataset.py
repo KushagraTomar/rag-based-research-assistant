@@ -1,9 +1,3 @@
-"""Draft an eval dataset by sampling chunks from Pinecone and asking the judge LLM for a Q/A pair per chunk.
-
-Review the output by hand before trusting it.
-
-    python -m evals.generate_dataset --n 30 --out evals/dataset.jsonl
-"""
 import argparse
 import json
 import random
@@ -48,29 +42,32 @@ def sample_chunks(n: int, seed: int):
             break
     random.Random(seed).shuffle(ids)
 
-    # Fetch extra candidates since short chunks (headers, references) are skipped
-    candidates = ids[: n * 3]
     chunks = []
-    for start in range(0, len(candidates), 100):
-        vectors = index.fetch(ids=candidates[start:start + 100], namespace=PINECONE_NAMESPACE).vectors
-        for vid, vec in vectors.items():
-            text = (vec.metadata or {}).get("text", "")
+    for start in range(0, len(ids), 100):
+        batch_ids = ids[start:start + 100]
+        vectors = index.fetch(ids=batch_ids, namespace=PINECONE_NAMESPACE).vectors
+        for vid in batch_ids:
+            vec = vectors.get(vid)
+            metadata = (vec.metadata if vec else None) or {}
+            text = metadata.get("text", "")
             if len(text) >= MIN_CHUNK_CHARS:
-                chunks.append((vid, text, vec.metadata.get("source")))
-    return chunks[:n]
+                chunks.append((vid, text, metadata.get("source")))
+                if len(chunks) == n:
+                    return chunks
+    return chunks
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--n", type=int, default=30, help="number of questions to generate")
     parser.add_argument("--out", default="evals/dataset.jsonl")
-    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     chain = qa_prompt | get_judge_llm().with_structured_output(QAPair)
-    chunks = sample_chunks(args.n, args.seed)
+    chunks = sample_chunks(args.n, 42)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
+
     with out.open("w") as f:
         for i, (chunk_id, text, source) in enumerate(chunks, start=1):
             qa = chain.invoke({"passage": text})
