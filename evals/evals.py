@@ -1,24 +1,12 @@
-"""Evaluate the RAG pipeline with RAGAS.
-
-    python -m evals.run --dataset evals/dataset.jsonl [--limit 10]
-
-Dataset: JSONL, one object per line: {"question": "...", "reference_answer": "..."}
-"""
 import argparse
 import json
-import warnings
 from datetime import datetime
 from pathlib import Path
-
-# RAGAS 0.4 marks its evaluate()-compatible metrics as deprecated in favour of
-# ragas.metrics.collections, which can't run through evaluate() yet
-warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from ragas import EvaluationDataset, RunConfig, evaluate
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
 from ragas.metrics import (
-    ContextRelevance,
     Faithfulness,
     LLMContextPrecisionWithReference,
     LLMContextRecall,
@@ -32,8 +20,7 @@ from evals.judge import get_judge_llm
 
 METRICS = {
     "Retrieval": [LLMContextPrecisionWithReference(), LLMContextRecall()],
-    # strictness=1: with several prompts per call, langchain-mistralai crashes summing Mistral's nested token usage
-    "Generation": [Faithfulness(), ResponseRelevancy(strictness=1), ContextRelevance()],
+    "Generation": [Faithfulness(), ResponseRelevancy(strictness=1)],
 }
 
 
@@ -71,7 +58,6 @@ def main():
         metrics=[metric for group in METRICS.values() for metric in group],
         llm=LangchainLLMWrapper(get_judge_llm()),
         embeddings=LangchainEmbeddingsWrapper(get_embeddings()),
-        # Few workers + patient retries: the judge model has a low per-minute rate limit
         run_config=RunConfig(max_workers=4, max_retries=10, max_wait=60, timeout=300),
     )
 

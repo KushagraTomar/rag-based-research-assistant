@@ -1,4 +1,3 @@
-"""The LLM that grades the RAG pipeline (RAGAS metrics) and drafts the eval dataset."""
 from functools import lru_cache
 
 from langchain_core.rate_limiters import InMemoryRateLimiter

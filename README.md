@@ -59,6 +59,34 @@ python -m app.retrieval.chunking
 
 If you change the embedding model, re-run ingestion (and update `PINECONE_INDEX_DIMENSION` if the vector size changes).
 
+## Evaluation
+
+The [evals/](evals/) folder scores the pipeline with [RAGAS](https://docs.ragas.io/), using `ministral-14b-2512` as the judge model. Run all commands from the project root with your API keys set, and index some PDFs first.
+
+1. Generate a question set from the indexed chunks:
+   ```bash
+   python -m evals.generate_dataset --n 30
+   ```
+   This samples chunks from Pinecone, skipping short ones such as headers and references, and asks the judge model to write one question and reference answer per chunk. The output goes to `evals/dataset.jsonl`. Review it before running the eval, and generate it again whenever you re-run ingestion, because each row points to a chunk ID.
+
+2. Run the eval:
+   ```bash
+   python -m evals.evals --limit 5   # quick check
+   python -m evals.evals             # full dataset
+   ```
+   Each question goes through the real pipeline, then RAGAS scores the result from 0 to 1 (higher is better):
+
+   | Metric | Component | Measures |
+   |--------|-----------|----------|
+   | `llm_context_precision_with_reference` | Retrieval | Whether the useful chunks are ranked near the top |
+   | `context_recall` | Retrieval | Whether the retrieved chunks contain everything in the reference answer |
+   | `faithfulness` | Generation | Whether every claim in the answer is supported by the retrieved chunks |
+   | `answer_relevancy` | Generation | Whether the answer addresses the question |
+
+   Each run writes to `evals/results/<timestamp>/`: `results.csv` has per-question scores, and `summary.json` has the averages plus the models, `k`, and dataset used.
+
+The judge model has a low per-minute rate limit, so a full run is slow and may retry calls. Options: `--dataset`, `--limit`, and `--out-dir` for the eval, and `--n` and `--out` for dataset generation.
+
 ## API
 
 | Method | Path | Description |
@@ -111,6 +139,7 @@ app/
   rag/         LangGraph retrieve-then-generate pipeline
   retrieval/   PDF loading, chunking, embeddings, Pinecone ingestion
   config.py    Model, chunking, and index settings
+evals/         RAGAS evaluation: dataset generation and scoring
 frontend/      React + Vite UI (PDF upload and Q&A)
 ```
 
