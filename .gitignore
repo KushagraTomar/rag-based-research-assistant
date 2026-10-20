@@ -184,3 +184,5 @@ Thumbs.db
 *.local
 
 data/
+# RAG eval outputs
+evals/results/

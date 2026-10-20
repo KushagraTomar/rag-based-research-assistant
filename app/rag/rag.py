@@ -15,6 +15,7 @@ from app.config import (
     MISTRAL_MODEL,
     PINECONE_INDEX_NAME,
     PINECONE_NAMESPACE,
+    RETRIEVAL_K,
 )
 
 
@@ -75,17 +76,20 @@ class RAGPipeline:
     def retrieve_documents(self, state: RAGState) -> RAGState:
         """Retrieve relevant chunks from the Pinecone index."""
         query = state["question"]
-        documents = self.vector_store.similarity_search(query, k=5)
+        documents = self.vector_store.similarity_search(query, k=RETRIEVAL_K)
         return {
             "documents": documents,
             "context": format_docs(documents),
         }
     
+    def run(self, question: str) -> RAGState:
+        """Run the full pipeline and return the final state (documents, context, answer)"""
+        state: RAGState = {"question": question}
+        return self.rag_workflow.invoke(state)
+
     def answer(self, question: str) -> str:
         """Answer a question using the RAG pipeline"""
-        state: RAGState = {"question": question}
-        result = self.rag_workflow.invoke(state)
-        return result["answer"]
+        return self.run(question)["answer"]
 
     def generate_answer(self, state: RAGState) -> RAGState:
         chain = generation_prompt | self.llm | StrOutputParser()
