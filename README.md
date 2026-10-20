@@ -87,6 +87,17 @@ The [evals/](evals/) folder scores the pipeline with [RAGAS](https://docs.ragas.
 
 The judge model has a low per-minute rate limit, so a full run is slow and may retry calls. Options: `--dataset`, `--limit`, and `--out-dir` for the eval, and `--n` and `--out` for dataset generation.
 
+### Latest results
+
+30 questions, generator `ministral-3b-2512`, judge `ministral-14b-2512`, top-5 retrieval (run `20261020-234827`):
+
+| Metric | Component | Score |
+|--------|-----------|-------|
+| `llm_context_precision_with_reference` | Retrieval | 0.770 |
+| `context_recall` | Retrieval | 0.908 |
+| `faithfulness` | Generation | 0.845 |
+| `answer_relevancy` | Generation | 0.898 |
+
 ## API
 
 | Method | Path | Description |
