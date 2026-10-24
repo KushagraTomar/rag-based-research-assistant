@@ -1,4 +1,5 @@
 """Routes for RAG API"""
+import hashlib
 import os
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from app.models.schemas import RAGRequest, RAGResponse
@@ -28,25 +29,28 @@ async def ask_question_endpoint(request: RAGRequest):
 
 
 @router.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
+def upload_pdf(file: UploadFile = File(...)):
     """Upload and ingest a PDF file"""
     try:
         # Validate file
         if not file.filename.endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are allowed")
         
-        # Save temporary file
-        temp_path = os.path.join(UPLOAD_DIR, file.filename)
+        # Save temporary file, named by content hash so concurrent uploads don't collide
+        content = file.file.read()
+        doc_hash = hashlib.sha256(content).hexdigest()
+        temp_path = os.path.join(UPLOAD_DIR, f"{doc_hash}.pdf")
         with open(temp_path, "wb") as buffer:
-            content = await file.read()
             buffer.write(content)
-                
-        # Ingest PDF into vector store
-        ingest_pdf(temp_path)
-        
-        # Clean up temporary file
-        os.remove(temp_path)
-        
+
+        try:
+            # Ingest PDF into vector store (plain def route, so FastAPI runs this in a worker thread)
+            ingest_pdf(temp_path)
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
         return {
             "status": "success",
             "message": f"PDF '{file.filename}' uploaded and indexed successfully!",
