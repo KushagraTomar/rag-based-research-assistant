@@ -3,7 +3,8 @@ import hashlib
 import os
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from app.models.schemas import RAGRequest, RAGResponse
-from app.retrieval.chunking import ingest_pdf
+from app.db import registry
+from app.retrieval.chunking import delete_vectors, ingest_document
 from app.rag.rag import rag_pipeline
 
 router = APIRouter(prefix="", tags=["rag"])
@@ -45,21 +46,52 @@ def upload_pdf(file: UploadFile = File(...)):
 
         try:
             # Ingest PDF into vector store (plain def route, so FastAPI runs this in a worker thread)
-            ingest_pdf(temp_path)
+            doc, ingested = ingest_document(temp_path, file.filename, doc_hash)
         finally:
             # Clean up temporary file
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
+        if not ingested and doc["status"] == "processing":
+            raise HTTPException(status_code=409, detail=f"PDF '{file.filename}' is already being indexed")
+
+        message = (
+            f"PDF '{file.filename}' uploaded and indexed successfully!"
+            if ingested
+            else f"PDF '{file.filename}' is already indexed."
+        )
         return {
             "status": "success",
-            "message": f"PDF '{file.filename}' uploaded and indexed successfully!",
-            "filename": file.filename
+            "message": message,
+            "filename": file.filename,
+            "doc_id": doc_hash,
+            "already_indexed": not ingested,
         }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error uploading PDF: {str(e)}")
+
+
+@router.get("/documents")
+def get_documents():
+    """List every PDF in the registry and its ingestion status"""
+    return registry.list_documents()
+
+
+@router.delete("/documents/{doc_id}")
+def remove_document(doc_id: str):
+    """Delete a PDF's chunks from Pinecone and its registry row"""
+    doc = registry.get_document(doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if doc["status"] == "processing":
+        raise HTTPException(status_code=409, detail="Document is being indexed; try again later")
+    # delete document chuncks from Pinecone
+    delete_vectors(doc_id)
+    # delete document from registry
+    registry.delete_document(doc_id)
+    return {"status": "success", "message": f"Deleted '{doc['filename']}'", "doc_id": doc_id}
 
 
 # @router.get("/cache/stats")
