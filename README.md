@@ -5,6 +5,7 @@ A Retrieval-Augmented Generation (RAG) assistant for answering questions about y
 - **Backend:** FastAPI, LangChain, LangGraph
 - **LLM & embeddings:** Mistral AI (`ministral-3b-2512` for answers, `mistral-embed` for embeddings)
 - **Vector store:** Pinecone (serverless, AWS `us-east-1`)
+- **Document registry:** PostgreSQL (tracks which PDFs are indexed)
 - **Frontend:** React + Vite, Axios
 
 ## How it works
@@ -29,7 +30,13 @@ Requirements: Python 3.10+, Node.js, a Mistral API key, and a Pinecone API key. 
    export PINECONE_API_KEY="your-pinecone-api-key"
    ```
 
-3. Install the frontend dependencies:
+3. Start Postgres (the backend creates the `documents` table on startup):
+   ```bash
+   docker compose up -d postgres
+   ```
+   It connects to `postgresql://rag:rag@localhost:5432/rag` by default. Set `DATABASE_URL` to use a different database.
+
+4. Install the frontend dependencies:
    ```bash
    cd frontend
    npm install
@@ -56,6 +63,8 @@ To index many PDFs at once without the UI, put them in a `data/` folder at the p
 ```bash
 python -m app.retrieval.chunking
 ```
+
+Each PDF is identified by the SHA-256 of its contents and recorded in the `documents` table. Its chunks are stored in Pinecone as `<sha256>#<n>`. A PDF that is already indexed with the current embedding model and chunk settings is skipped. If those settings have changed, its old chunks are replaced. `GET /documents` lists the registry, and `DELETE /documents/{id}` removes a PDF's chunks and its row.
 
 If you change the embedding model, re-run ingestion (and update `PINECONE_INDEX_DIMENSION` if the vector size changes).
 

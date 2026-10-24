@@ -10,5 +10,6 @@ pinecone
 pydantic
 numpy
 redis
+psycopg[binary]
 python-multipart
 ragas==0.4.3

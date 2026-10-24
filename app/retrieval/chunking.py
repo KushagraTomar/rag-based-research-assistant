@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 from langchain_core.documents import Document
 from langchain_pymupdf4llm import PyMuPDF4LLMLoader
@@ -7,7 +7,8 @@ from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharac
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone, ServerlessSpec
 
-from app.retrieval.utils import convert_section_headers
+from app.db import registry
+from app.retrieval.utils import convert_section_headers, file_sha256
 
 from app.config import (
     PINECONE_API_KEY,
@@ -58,26 +59,57 @@ def ensure_index() -> None:
         )
 
 
-def ingest_pdf(pdf_path: str) -> int:
+def delete_vectors(doc_id: str) -> None:
+    """Delete every chunk of a document from Pinecone (chunk IDs are '<doc_id>#<n>')."""
+    index = Pinecone(api_key=PINECONE_API_KEY).Index(PINECONE_INDEX_NAME)
+    for ids in index.list(prefix=f"{doc_id}#", namespace=PINECONE_NAMESPACE):
+        index.delete(ids=ids, namespace=PINECONE_NAMESPACE)
+
+
+def ingest_pdf(pdf_path: str, doc_id: str) -> int:
     """Load, chunk and upload a single PDF. Returns number of chunks indexed."""
     ensure_index()
     # Load pdfs
     documents = PyMuPDF4LLMLoader(
-        file_path=str(pdf_path), 
+        file_path=str(pdf_path),
         mode="single").load()
     # Chunk documents
     chunks = chunk_documents(documents)
+    for chunk in chunks:
+        chunk.metadata["doc_id"] = doc_id
+    # Remove chunks from an earlier or failed run, so a smaller re-chunk leaves no strays
+    delete_vectors(doc_id)
     # Embed and upload to Pinecone
     PineconeVectorStore.from_documents(
         documents=chunks,
         embedding=get_embeddings(),
+        ids=[f"{doc_id}#{i}" for i in range(len(chunks))],
         index_name=PINECONE_INDEX_NAME,
         namespace=PINECONE_NAMESPACE,
     )
     return len(chunks)
 
 
+def ingest_document(pdf_path: str, filename: str, doc_id: str) -> Tuple[dict, bool]:
+    """Ingest a PDF and record it in the registry, unless it is already indexed
+    with the current settings or being ingested. Returns (registry row, ingested)."""
+    if not registry.claim_document(doc_id, filename):
+        return registry.get_document(doc_id), False
+    try:
+        chunk_count = ingest_pdf(pdf_path, doc_id)
+    except Exception as e:
+        registry.mark_failed(doc_id, str(e))
+        raise
+    registry.mark_done(doc_id, chunk_count)
+    return registry.get_document(doc_id), True
+
+
 if __name__ == "__main__":
+    registry.init_db()
     data_dir = Path(__file__).resolve().parents[2] / "data"
     for pdf in sorted(data_dir.glob("*.pdf")):
-        print(f"{pdf.name}: {ingest_pdf(str(pdf))} chunks")
+        doc, ingested = ingest_document(str(pdf), pdf.name, file_sha256(pdf))
+        if ingested:
+            print(f"{pdf.name}: {doc['chunk_count']} chunks")
+        else:
+            print(f"{pdf.name}: skipped ({doc['status']})")

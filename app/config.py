@@ -13,3 +13,5 @@ PINECONE_INDEX_NAME = "pdf-structured-rag-mistral"
 PINECONE_INDEX_DIMENSION = 1024
 PINECONE_NAMESPACE = "default"
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://rag:rag@localhost:5432/rag")
